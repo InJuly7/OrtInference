@@ -5,6 +5,7 @@
 #include "Yolov10SAM.h"
 #include "Yolov10Trace.h"
 #include "PaddleOCR.h"
+#include "TableSeg.h"
 
 void yolo(){
     auto yolov10 = std::make_unique<Yolov10>();
@@ -180,9 +181,9 @@ void paddleocr(){
     std::vector<std::string> onnx_paths{
         "../models/ocr/mobile/det.onnx",
         "../models/ocr/mobile/cls.onnx", // [3,80,160]
-        "../models/ocr/mobile/rec_zh.onnx" // [-1,3,48,320]
+        "../models/ocr/mobile/rec_zh_en.onnx" // [-1,3,48,320]
     };
-    auto r = paddleocr->initialize(onnx_paths,true);
+    auto r = paddleocr->initialize(onnx_paths,false);
     if(r.index() != 0){
         std::string error = std::get<std::string>(r);
         std::println("错误：{}",error);
@@ -194,7 +195,7 @@ void paddleocr(){
         .text = 0.5f, 
         .thresh = 0.5f,
         .unclip_ratio = 2.5f, // 1.0 ~ 3.0
-        .dictionary = "../assets/text/zh_dict.txt"
+        .dictionary = "../assets/text/zh_en_dict.txt"
     });
 
     std::string folder_path = "../assets/ocr/*.jpg";
@@ -223,12 +224,52 @@ void paddleocr(){
         }
     }
 }
+
+void tableseg(){
+    auto table = std::make_unique<TableSeg>();
+    std::vector<std::string> onnx_paths{"../models/table/best.onnx"};
+    auto r = table->initialize(onnx_paths,true);
+    if(r.index() != 0){
+        std::string error = std::get<std::string>(r);
+        std::println("错误：{}",error);
+        return;
+    }
+    table->setparms({.bin = 0.5f,.score=0.5f,.nms=0.5f});
+    
+    std::string folder_path = "../assets/table/*.jpg";
+    std::string output_path = "../assets/output/";
+
+    std::vector<cv::String> paths;
+    cv::glob(folder_path, paths, false);
+
+    for (const auto& path : paths) {
+        std::println("path={}",path);
+        cv::Mat image = cv::imread(path);
+        auto start = std::chrono::high_resolution_clock::now();
+        auto result = table->inference(image);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        std::println("duration = {}ms",duration);
+        if(result.index() == 0){
+            auto tmp = std::filesystem::path(path).filename().string();
+            auto filename = MT::ReplaceExten(tmp,".png");
+            cv::imwrite(output_path + filename,image);
+            // cv::imshow("Image", image);
+            // cv::waitKey(0);
+        }else{
+            std::string error = std::get<std::string>(result);
+            std::println("错误：{}",error);
+            continue;
+        }
+    }
+}
 int main(int argc, char const *argv[]){
     // yolo();
     // yolosam();
     // yolotrace();
     // sam2();
-    paddleocr();
+    // paddleocr();
+    tableseg();
     return 0;   
 }
 

@@ -254,7 +254,6 @@ namespace MT{
         int left = (net_w - width) / 2;
         cv::Mat result_img = img(cv::Rect(left, top, width, height)).clone();
         cv::resize(result_img,result_img,ori_size);
-        std::println("[{},{},{},{}]",top,left,width,height);
         return result_img;
     }
     inline float ComputeIou(const cv::Rect& a, const cv::Rect& b) {
@@ -275,7 +274,26 @@ namespace MT{
         // 处理除零情况
         return unionArea > 0.0f ? intersection / unionArea : 0.0f;
     }
-    
+    inline cv::Rect unReference(cv::Rect rect, cv::Size ori, cv::Size infer) {
+        float scaleX = static_cast<float>(ori.width)  / infer.width;
+        float scaleY = static_cast<float>(ori.height) / infer.height;
+
+        return cv::Rect(
+            static_cast<int>(rect.x       * scaleX),
+            static_cast<int>(rect.y       * scaleY),
+            static_cast<int>(rect.width   * scaleX),
+            static_cast<int>(rect.height  * scaleY)
+        );
+    }
+    inline cv::Rect unReferencePad(cv::Rect rect, cv::Size ori, cv::Size infer) {
+        float r = std::min(float(infer.width)/ori.width,float(infer.height)/ori.height);//缩放比例
+        int top = (infer.height - ori.height*r) / 2,left = (infer.width - ori.width*r) / 2;
+        int x = (rect.x - left) / r;
+        int y = (rect.y - top) / r;
+        int w = rect.width / r;
+        int h = rect.height / r;
+        return cv::Rect(x,y,w,h);
+    }
     //************************************************************************
     class OCRDictionary {
     public:
